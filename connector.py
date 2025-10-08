@@ -9,6 +9,10 @@ import seaborn as sns
 from tqdm import tqdm
 import json
 import base64
+import pennylane as qml
+from pennylane import numpy as pnp
+import torch.nn as nn
+import torch.nn.functional as F
 import uuid
 
 from sklearn.preprocessing import StandardScaler
@@ -22,9 +26,7 @@ from sklearn.ensemble import RandomForestClassifier
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
-# -------------------------
-# USER PATHS - edit these
-# -------------------------
+#paths to my models
 CLASSICAL_MODEL_PATH = "nasa_model_finalClassical1.pkl"
 CLASSICAL_SCALER_PATH = "nasa_scalerfinalClassical1.pkl"
 QML_MODEL_PATH = "nasa_qml_model1.pt"
@@ -32,9 +34,7 @@ QML_SCALER_PATH = "nasa_qml_scaler1.pkl"
 OUTPUT_DIR = "/home/toheebogunade/Workspace/NASA/outputs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# -------------------------
-# Utility: load classical model + scaler
-# -------------------------
+#loading the classical model
 def load_classical():
     try:
         print(f"Loading classical model from: {os.path.abspath(CLASSICAL_MODEL_PATH)}")
@@ -50,13 +50,7 @@ def load_classical():
         print(f"Failed to load classical model/scaler: {e}")
         raise
 
-# -------------------------
-# Utility: load QML model & restore PyTorch module architecture
-# -------------------------
-import pennylane as qml
-from pennylane import numpy as pnp
-import torch.nn as nn
-import torch.nn.functional as F
+#
 
 def build_qml_model(n_qubits):
     dev = qml.device("default.qubit", wires=n_qubits)
@@ -109,9 +103,7 @@ def load_qml(n_qubits):
         print(f"Failed to load QML model/scaler: {e}")
         raise
 
-# -------------------------
-# Preprocessing: ensure feature order matches training
-# -------------------------
+
 FEATURE_COLUMNS_CLASSICAL = [
     "orb_period", "tran_dur", "tran_depth",
     "planet_radius", "eq_temp", "insolation",
@@ -148,9 +140,7 @@ def preprocess_input(df, scaler=None, keep_n_for_qml=None, is_qml=False):
         print(f"Preprocessing failed: {e}")
         raise
 
-# -------------------------
-# Model inference helpers
-# -------------------------
+
 def predict_classical(clf, X_scaled):
     if hasattr(clf, "predict_proba"):
         probs = clf.predict_proba(X_scaled)[:, 1]
@@ -233,7 +223,6 @@ def explain_shap_rf(clf, X_sample, feature_names, outpath_prefix):
 
 
 
-# ---------- connector.py (replace explain_perm_qml) ----------
 def explain_perm_qml(qml_model, X_val, y_val, feature_names, outpath_prefix):
     try:
         # Prediction wrapper for QML
@@ -275,9 +264,7 @@ def explain_perm_qml(qml_model, X_val, y_val, feature_names, outpath_prefix):
         return None
 
 
-# -------------------------
-# Helper to encode image to base64
-# -------------------------
+
 def encode_image_to_base64(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
@@ -285,9 +272,7 @@ def encode_image_to_base64(path):
         return base64_str
     return None
 
-# -------------------------
-# Ensemble function
-# -------------------------
+
 def ensemble_predict(
     df_input,
     clf,
@@ -300,7 +285,7 @@ def ensemble_predict(
     unique_id=str(uuid.uuid4())
 ):
     try:
-        # --- Preprocess inputs ---
+        # --- Preprocessing of inpusts
         _, X_scaled_classical = preprocess_input(
             df_input, scaler=clf_scaler, keep_n_for_qml=None, is_qml=False
         )
@@ -308,20 +293,20 @@ def ensemble_predict(
             df_input, scaler=qml_scaler, keep_n_for_qml=n_qubits, is_qml=True
         )
 
-        # --- Make predictions ---
+        # --- Make predictions 
         p_clf = predict_classical(clf, X_scaled_classical)
         p_qml = predict_qml(qml_model, X_q) if qml_model is not None else np.zeros(len(df_input))
         p_ensemble = weight_classical * p_clf + weight_qml * p_qml
         preds = (p_ensemble >= 0.5).astype(int)
 
-        # --- Prepare output dataframe ---
+        # --- Prepare output dataframe 
         out = df_input.copy().reset_index(drop=True)
         out["prob_classical"] = p_clf
         out["prob_qml"] = p_qml
         out["prob_ensemble"] = p_ensemble
         out["pred_ensemble"] = preds
 
-        # --- Paths ---
+        # --- Paths 
         explain_prefix = os.path.join(OUTPUT_DIR, f"explain_{unique_id}")
         hist_prefix = os.path.join(OUTPUT_DIR, f"hist_{unique_id}_")
         pairplot_path = os.path.join(OUTPUT_DIR, f"pairplot_{unique_id}.png")
@@ -330,7 +315,7 @@ def ensemble_predict(
         combined_path = os.path.join(OUTPUT_DIR, f"combined_importances_{unique_id}.png")
         predictions_path = os.path.join(OUTPUT_DIR, f"ensemble_predictions_{unique_id}.csv")
 
-        # --- Visualizations ---
+        # --- Visualizations 
         visualize_input(df_input, hist_prefix, pairplot_path, tsne_path, umap_path)
 
         shap_vals = None
@@ -428,9 +413,7 @@ def ensemble_predict(
         raise
 
 
-# -------------------------
-# Visualizations of uploaded data
-# -------------------------
+#users should be able to visualize data, function below
 def visualize_input(df_input, hist_prefix, pairplot_path, tsne_path, umap_path):
     try:
         for col in FEATURE_COLUMNS_CLASSICAL:
@@ -461,9 +444,7 @@ def visualize_input(df_input, hist_prefix, pairplot_path, tsne_path, umap_path):
         print(f"Visualization failed: {e}")
         raise
 
-# -------------------------
-# Main CLI
-# -------------------------
+#cli
 def main(args):
     clf, clf_scaler = load_classical()
     qml_model, qml_scaler = load_qml(n_qubits=6)
@@ -490,9 +471,7 @@ def main(args):
     print("Saved ensemble predictions, explanation plots, and JSON output to", OUTPUT_DIR)
     print(result.head())
 
-# -------------------------
-# Quick test / sandbox
-# -------------------------
+#sandbox testing before prod
 if __name__ == "__main__":
     import sys
     parser = argparse.ArgumentParser(description="Ensemble exoplanet predictions.")
