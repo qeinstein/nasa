@@ -1,6 +1,5 @@
 """
-api_wrapper.py
-FastAPI wrapper for connector.py (ensemble exoplanet prediction).
+FastAPI wrapper for connector.py 
 
 - Loads models via connector.py functions.
 - Calls visualize_input() and ensemble_predict() with unique IDs.
@@ -36,7 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or specify ["http://localhost:5173"]
+    allow_origins=["*"],  # or specify ["http://localhost:5173"], only specify for specific use case, do not chnage!1!
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -125,7 +124,6 @@ def read_output_json(unique_id: str) -> Dict[str, Any]:
     return None
 
 
-# ---------- api_wrapper.py (replace generate_explanations) ----------
 async def generate_explanations(df_input, clf, clf_scaler, qml_model, qml_scaler, unique_id: str, n_qubits: int = 6) -> Dict[str, Any]:
     explanations = {
         "classical_explanation": "",
@@ -327,7 +325,7 @@ def root():
 import aiohttp
 import asyncio
 
-# Function to ping the health endpoint
+# Function to ping the health endpoint(No longer needed since deployed on hugging face)
 async def ping_server():
     async with aiohttp.ClientSession() as session:
         while True:
